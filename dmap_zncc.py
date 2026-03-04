@@ -1,14 +1,20 @@
 """
-Compute dense depth-maps using 1D evolutionary search with ZNCC patch similarity.
+Compute dense depth-maps using 1D evolutionary search with ZNCC patch matching.
 
 This script drives the EC-based line search implemented in `modules/ec.py` to
-compute per-pixel depth values for images in a multi-view dataset.
+compute per-pixel depth values for images in a multi-view dataset using Zero-mean Normalized
+Cross-Correlation (ZNCC) of image patches as the similarity measure.
 
 Supports:
 - Single-core execution via `ec.line_search()`
 - Shared-memory multi-processing via `ec.line_search_shm()`
 
 The EC algorithm can be changed at ec.line_search() (default is CMA-ES which performs well).
+
+The results are saved in .mat format containing:
+- TA: Depth values for each pixel
+- FA: Fitness values for each pixel
+- PA: Pixel coordinates (image index, x, y) for each depth value
 """
 
 import os
@@ -93,18 +99,18 @@ if __name__ == '__main__':
         sm.init(shared_base, shared_shape)
         sm.shared_data[:] = I[:]
 
-        mp.freeze_support()                         # Required for Windows systems
-        NPROC = mp.cpu_count() - 4                  # Number of processes to spawn
-        if (NPROC < 2):                             # Set minimum 2
-            NPROC = 2
+        mp.freeze_support()                     # Required for Windows systems 
+        n_proc = mp.cpu_count() - 2             # Leave some cores free to avoid system overload
+        if (n_proc < 2):                        # Ensure at least 2 processes for parallel execution
+            n_proc = 2
 
         R = []
-        pool = mp.Pool(processes = NPROC,
+        pool = mp.Pool(processes = n_proc,
                        initializer = sm.init,
                        initargs = (shared_base, shared_shape))
     else:
         # Single-core execution (no shared memory, direct calls to ec.line_search)
-        NPROC = 1
+        n_proc = 1
 
     # Initialize lists for depth, fitness, and pixel coordinates
     TA = []
@@ -121,7 +127,7 @@ if __name__ == '__main__':
     combined = [(r,s,t) for r in im_ind for s in x_ind for t in y_ind]
     n_pts = len(combined)
     
-    print('Processing {:,} points on {} threads...'.format(n_pts, NPROC))
+    print('Processing {:,} points on {} threads...'.format(n_pts, n_proc))
     pbar = tqdm(total=n_pts, unit=' points')
 
     # Process pixels
@@ -137,7 +143,6 @@ if __name__ == '__main__':
                                          ang_bound, k_best),
                                  callback = pbar_update)
             R.append(r)
-
         else:
             out = ec.line_search(I, P, B, ANG[imx0], imx0, x, y, patch_size, n_pop, n_gen,
                                  ang_bound, k_best)
@@ -151,7 +156,8 @@ if __name__ == '__main__':
         pool.join()
         TA = [r[0][0] for r in R]
         FA = [r[1][0] for r in R]
-
+    
+    # Close progress bar
     pbar.close()
 
     # Convert data to np.float32 to save disk space
@@ -160,7 +166,7 @@ if __name__ == '__main__':
 
     # Save final results
     rand_int = np.random.randint(100000, 999999)
-    file_name = dataset + '_dense_' + str(rand_int) + '.mat'
+    file_name = dataset + '_dmaps_' + str(rand_int) + '.mat'
     spio.savemat(file_name, dict(TA=TA, FA=FA, PA=PA), do_compression=True)
 
     # Print stats
