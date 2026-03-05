@@ -4,49 +4,11 @@ Reference implementation of the paper [Scalable Multi-View Stereo using CMA-ES a
 
 ## Overview
 
-This project implements a dense Multi-View Stereo (MVS) reconstruction pipeline that estimates per-pixel depth maps from calibrated multi-view images and fuses them into a dense 3D model.
+This repository implements a **Multi-View Stereo (MVS)** pipeline that reconstructs a dense 3D model from calibrated multi-view images.
 
-The method focuses on **scalability and robustness** in both textured and homogeneous regions, two common challenges in image-based 3D reconstruction. Unlike many existing MVS approaches that rely on spatial propagation or global regularization, this approach processes each pixel independently, enabling **pixel-level parallelization** and making the algorithm highly scalable for large datasets or multi-core systems.
+Per-pixel depths are estimated using **CMA-ES** optimization and refined using a distance transform–based adaptive filtering strategy. To handle different surface characteristics, the method combines **ZNCC** template matching for textured regions and **DAISY** descriptors for homogeneous regions. The resulting depth maps are filtered, validated across views, and fused into a dense 3D reconstruction.
 
-The pipeline combines **photometric matching, evolutionary optimization, and adaptive depth filtering** to produce accurate and complete reconstructions.
-
-## Key Ideas
-
-### 1. Per-pixel depth estimation using evolutionary optimization
-
-Depth for each pixel is estimated using Covariance Matrix Adaptation Evolution Strategy (CMA-ES), a derivative-free optimization algorithm that minimizes a photometric discrepancy function across multiple views.
-
-### 2. Hybrid matching for textured and homogeneous regions
-
-Different similarity measures are used depending on the local image structure:
-
-* ZNCC template matching for **textured regions** to recover fine geometric details.
-* DAISY feature descriptors for **homogeneous regions**, where template matching becomes unreliable.
-
-A distance transform computed from image edges determines which similarity measure should be used at each pixel.
-
-### 3. Distance transform-based adaptive depth refinement
-
-Since depth is estimated independently per pixel, the initial depth maps can be noisy. To address this, the method applies a **distance transform-based adaptive median filter**:
-
-* Small filters near edges to preserve geometric boundaries
-* Larger filters in homogeneous regions to enforce smoothness
-
-This refinement suppresses noise while preserving fine structural details.
-
-### 4. Cross-view consistency filtering
-
-Depth values are validated across neighboring views using a **cross-view consistency check** to remove outliers and ensure geometrically consistent depth maps.
-
-### 5. 3D reconstruction
-
-The final refined depth maps are:
-
-1. Back-projected into 3D space
-2. Merged into a dense point cloud
-3. Converted into a watertight surface using Poisson surface reconstruction
-
-## Key Features
+### Key Features
 
 * Pixel-level parallelization for high scalability
 * Handles both textured and textureless regions
@@ -54,18 +16,64 @@ The final refined depth maps are:
 * Adaptive depth smoothing based on image structure
 * Produces dense and complete 3D reconstructions
 
-## Evaluation
+## Method
 
-The method was evaluated on the **Middlebury Multi-View Stereo benchmark** datasets: TempleRing and DinoRing.
+The pipeline consists of the following steps:
 
-Results demonstrate:
+1. **Depth estimation** using CMA-ES, a derivative-free optimization algorithm, to minimize photometric discrepancy across views.
+2. **Hybrid matching strategy**
+   * ZNCC template matching for textured regions
+   * DAISY descriptors for homogeneous regions
+   * A distance transform from image edges determines which similarity measure to use per pixel.
+3. **Adaptive median filtering** based on the distance transform to suppress noise while preserving edges.
+4. **Cross-view consistency filtering** to remove inconsistent depth estimates.
+5. **Depth fusion and surface reconstruction** to produce a dense point cloud and mesh using **Poisson Surface Reconstruction**.
 
-* High reconstruction completeness (>98%)
-* Competitive accuracy compared to state-of-the-art MVS methods
+## How to Run
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/nirmalsnair/mvs-cmaes.git
+cd mvs-cmaes
+```
+
+### 2. Download a dataset
+
+Download a calibrated multi-view dataset such as [Middlebury MVS](https://vision.middlebury.edu/mview/data/) (e.g., *DinoRing* or *TempleRing*):
+
+Place the images and camera parameters in the dataset directory expected by the scripts.
+
+### 3. Generate depth maps
+
+Compute depth maps using the two matching strategies:
+
+```bash
+python dmap_zncc.py
+python dmap_daisy.py
+```
+
+### 4. Merge depth maps
+
+Merge the two depth map sets and export them to an [MVE scene](https://github.com/simonfuhrmann/mve/wiki/MVE-File-Format):
+
+```bash
+python merge_dmaps.py
+```
+
+This step combines the depth maps, applies filtering and consistency checks, and writes the results in **MVE scene format**.
+
+### 5. Reconstruct the 3D model
+
+The generated scene is compatible with **Multi-View Environment (MVE)**:
+
+[https://github.com/simonfuhrmann/mve](https://github.com/simonfuhrmann/mve)
+
+Use the MVE tools to convert depth maps into a point cloud and run **Poisson Surface Reconstruction** to obtain the final mesh.
 
 ## Citation
 
-```
+```bibtex
 @inproceedings{nair2021scalable,
   title={Scalable multi-view stereo using CMA-ES and distance transform-based depth map refinement},
   author={Nair, Nirmal S and Nair, Madhu S},
