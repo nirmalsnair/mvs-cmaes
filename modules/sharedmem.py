@@ -1,4 +1,4 @@
-'''
+"""
 Shared memory utilities for multi-processing in EC-based line search.
 
 This module provides functions to initialize and access shared memory for image data
@@ -7,7 +7,7 @@ unnecessary copying.
 
 This is used in the `dmap_zncc.py` and `dmap_daisy.py` scripts to enable shared-memory
 multi-processing for the EC-based line search implemented in `modules/ec.py`.
-'''
+"""
 
 import numpy as np
 

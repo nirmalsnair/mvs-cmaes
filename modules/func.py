@@ -9,8 +9,6 @@ are used by the higher-level scripts such as ``dmap_zncc.py`` and
 """
 
 import os
-import gc
-import sys
 import cv2
 import numpy as np
 from numba import jit
@@ -18,34 +16,7 @@ import scipy.linalg as spla
 import numpy.linalg as npla
 
 
-# Taken from: https://stackoverflow.com/a/53705610/7046003
-# Returns size of object in bytes
-def get_obj_size(obj):
-    marked = {id(obj)}
-    obj_q = [obj]
-    sz = 0
-
-    while obj_q:
-        sz += sum(map(sys.getsizeof, obj_q))
-
-        # Lookup all the object referred to by the object in obj_q.
-        # See: https://docs.python.org/3.7/library/gc.html#gc.get_referents
-        all_refr = ((id(o), o) for o in gc.get_referents(*obj_q))
-
-        # Filter object that are already marked.
-        # Using dict notation will prevent repeated objects.
-        new_refr = {o_id: o for o_id, o in all_refr if o_id not in marked and not isinstance(o, type)}
-
-        # The new obj_q will be the ones that were not marked,
-        # and we will update marked with their ids so we will
-        # not traverse them again.
-        obj_q = new_refr.values()
-        marked.update(new_refr.keys())
-
-    return sz
-
-
-# Load images from a folder
+# Load images from a folder 
 # mode: 0 = Grayscale, 1 = Color, -1 = Unchanged
 # is_return_file_list: If True, return a list of file names in addition to the images
 def load_images_from_folder(folder, mode=0, is_return_file_list=False):
@@ -97,11 +68,13 @@ def cam_factor(P):
     return K, R, T
 
 
+# Compute camera position from camera matrix
 def cam_position(P):
     K, R, T = cam_factor(P)
     return -np.transpose(R).dot(T)
 
 
+# Compute camera positions for all cameras
 def cam_position_all(P):
     ncam = len(P)
     POS = np.zeros((ncam,3,1))
@@ -111,6 +84,7 @@ def cam_position_all(P):
     return POS
 
 
+# Compute camera orientation from camera matrix
 def cam_orientation(P):
     o = P[-1,0:3].reshape((3,1))
     if npla.norm(o) != 0:
@@ -118,6 +92,7 @@ def cam_orientation(P):
     return o
 
 
+# Compute camera orientations for all cameras
 def cam_orientation_all(P):
     ncam = len(P)
     ORN = np.zeros((ncam,3,1))
@@ -219,12 +194,14 @@ def cam_project(P, X):
 
 
 # Compute ZNCC similarity between two image patches.
-# Returns a single scalar value representing the similarity between the two patches.
-# ZNCC is in the range [-1, 1], where 1 means perfect positive correlation, -1 means
-# perfect negative correlation, and 0 means no correlation.
-# If the input patches have different sizes or are empty, this function returns -1.
 @jit(nopython=True, nogil=True)
 def zncc(im1, im2):
+    """
+    Returns a single scalar value representing the similarity between the two patches.
+    ZNCC is in the range [-1, 1], where 1 means perfect positive correlation, -1 means
+    perfect negative correlation, and 0 means no correlation.
+    If the input patches have different sizes or are empty, this function returns -1.
+    """
     r1, c1 = im1.shape
     r2, c2 = im2.shape
 
@@ -251,22 +228,19 @@ def gradient(im):
     gy = np.zeros((r, c))
 
     for i in range(r):
-        gx[i,0] = im[i, 1] - im[i, 0]           # First column
-        gx[i,c-1] = im[i, c-1] - im[i, c-2]     # Last column
-
-        for j in range(1, c-1):                 # Except first and last columns
+        gx[i,0] = im[i, 1] - im[i, 0]               # First column
+        gx[i,c-1] = im[i, c-1] - im[i, c-2]         # Last column
+        for j in range(1, c-1):                     # Except first and last columns
             gx[i,j] = (im[i, j+1] - im[i, j-1]) / 2
 
     for j in range(c):
         gy[0,j] = im[1, j] - im[0, j]
         gy[r-1,j] = im[r-1, j] - im[r-2, j]
-
         for i in range(1, r-1):
             gy[i,j] = (im[i+1, j] - im[i-1, j]) / 2
 
     gm = (gx**2 + gy**2) ** 0.5
-
-    return gx, gy, gm                           # np.gradient returns gy, gx
+    return gx, gy, gm                               # np.gradient returns gy, gx
 
 
 # Python implementation of np.clip since Numba (0.45.1) doesn't yet support np.clip
@@ -313,7 +287,6 @@ def adaptive_median_gm(im, gm):
     for i in range(r):
         for j in range(c):
             pad_size = int(gm[i,j] / 2)
-
             icentre = i + pad_max
             jcentre = j + pad_max
 
@@ -331,7 +304,6 @@ def adaptive_median_gm(im, gm):
                 "Patch-size {} doesnt match Median filter-size {}".format(gm[i,j], patch.shape[0])
 
             im_med[i,j] = np.nanmedian(patch)
-
     return im_med, median_sizes
 
 
@@ -343,13 +315,12 @@ def adaptive_gaussian_gm(im, gm):
     im_gauss = np.zeros((r,c))
     gauss_sizes = np.zeros((r,c))
 
-    pad_max = int(np.max(gm) / 2)                           # Implicit floor
+    pad_max = int(np.max(gm) / 2)
     im_pad = np.pad(im, pad_max, mode='reflect')
 
     for i in range(r):
         for j in range(c):
             pad_size = int(gm[i,j] / 2)
-
             i_centre = i + pad_max
             j_centre = j + pad_max
 
@@ -369,59 +340,12 @@ def adaptive_gaussian_gm(im, gm):
             gauss_sigma = (patch.shape[0] - 1) / (2 * 4)
             p_centre = int(patch.shape[0] / 2)
             im_gauss[i,j] = ndimage.gaussian_filter(patch, sigma=gauss_sigma)[p_centre, p_centre]
-
     return im_gauss, gauss_sizes
 
 
-# Modified version of https://stackoverflow.com/a/29677616/7046003
-# !!!: NaN in `values` is fine but in `weights` returns NaN
-# !!!: Don't know fully how NaN values are handled (np.sort places them last)
-@jit(nopython=True, nogil=True)
-def weighted_quantile(values, weights, quantiles):
-    assert np.all(quantiles >= 0) and np.all(quantiles <= 1), \
-        'Quantiles should be in [0, 1]'
-
-    v = values.flatten()
-    w = weights.flatten()
-    assert(len(v) == len(w)), "Values Weights size mismatch"
-
-    sorter = np.argsort(v)
-    v = v[sorter]
-    w = w[sorter]
-
-    weighted_quantiles = np.cumsum(w) - 0.5 * w
-    weighted_quantiles /= np.sum(w)
-
-    return np.interp(quantiles, weighted_quantiles, v)
-
-
-# Fixed size weighted median filter applied to each pixel in an image
-# !!!: Check weight normalization step
-def im_weighted_median(im, w, s):
-    r, c = np.shape(im)
-    im_wmed = np.zeros((r,c))
-
-    pad_size = int(s / 2)                                # Implicit floor
-    im_pad = np.pad(im, pad_size, mode='reflect')
-    w_pad = np.pad(w, pad_size, mode='reflect')
-
-    for i in range(r):
-        for j in range(c):
-            i_end = i + 2 * pad_size + 1
-            j_end = j + 2 * pad_size + 1
-
-            im_patch = im_pad[i:i_end, j:j_end]
-            w_patch = w_pad[i:i_end, j:j_end]
-
-            # Normalize weights in a patch (?)
-            w_patch = (w_patch - np.min(w_patch)) / (np.max(w_patch) - np.min(w_patch))
-
-            assert(im_patch.shape[0] == im_patch.shape[1] == s), "Patch size mismatch"
-            im_wmed[i,j] = weighted_quantile(im_patch, w_patch, np.array([0.5]))[0]
-
-    return im_wmed
-
-
+# Convert camera matrices from Middlebury Mview dataset par.txt file to standard format
+# used in this codebase.
+# Returns P : ncam x 3 x 4
 def mview2standard(fpath):
     fhandle = open(fpath, 'r')
     flines = fhandle.readlines()
@@ -442,6 +366,7 @@ def mview2standard(fpath):
 
 
 # Load MVE files (depth maps and normal maps) and convert to standard format
+# Refer: https://github.com/simonfuhrmann/mve/wiki/MVE-File-Format
 def mvei2standard(file_path):
     with open(file_path, 'rb') as f:
         f.seek(11)                                              # Skip header (11 bytes)
@@ -495,10 +420,36 @@ def interp_missing(a, method):
     return interp
 
 
-# Cross-view consistency check for depth maps
+# Cross-view consistency check for a single depth map
 @jit(nopython=True, nogil=True)
 def crossview_consistency(imx0, D, P, ANG, ang_low, ang_high, k, d_tol):
-    D_consist = D[imx0].copy()
+    """
+    Returns the cross-view consistency-filtered depth map and the number of cross-view
+    consistent neighbors for each pixel.
+
+    The cross-view consistency check is performed by comparing the depth values of a pixel in the
+    current view with the depth values of the same pixel in the neighboring views. The neighboring
+    views are selected based on the angle between the views. The check is performed by projecting
+    the 3D point onto the image plane of the neighboring views and checking if the projected point
+    is within the depth tolerance of the depth value in the neighboring view. If the projected point
+    is within the depth tolerance, the depth value in the current view is considered cross-view
+    consistent. The cross-view consistency check is performed for all pixels in the image.
+
+    Parameters:
+    imx0: Index of the current view
+    D: Depth map
+    P: Camera matrices
+    ANG: Angle between views
+    ang_low: Minimum angle between views
+    ang_high: Maximum angle between views
+    k: Minimum number of neighbors needed for cross-view consistency check
+    d_tol: Absolute depth tolerance for cross-view consistency check
+
+    Returns:
+    D_cvc: Cross-view consistency-filtered depth map
+    C: Number of cross-view consistent neighbors for each pixel
+    """
+    D_cvc = D[imx0].copy()
     n_cam, n_row, n_col = D.shape
     X = np.ones((4,1))
     C = np.zeros_like(D[imx0])
@@ -507,7 +458,7 @@ def crossview_consistency(imx0, D, P, ANG, ang_low, ang_high, k, d_tol):
 
     for x in range(n_col):
         for y in range(n_row):
-            t = D[imx0, y, x]
+            t = D[imx0, y, x] # Depth value in the current view at pixel (x,y)
 
             if (t != 0):
                 point = np.array((x,y,1)).reshape((3,1))
@@ -518,28 +469,28 @@ def crossview_consistency(imx0, D, P, ANG, ang_low, ang_high, k, d_tol):
                     pt = cam_project(P[iv], X)
                     xi = int(np.round(pt[0,0]))
                     yi = int(np.round(pt[1,0]))
-
                     rpos2, rdir2 = camera_ray_2(P[iv], pt)
-                    t2 = (rdir2.T).dot(X[0:3] - rpos2)[0,0]
+                    t2 = (rdir2.T).dot(X[0:3] - rpos2)[0,0] # Depth value in the neighboring view at pixel (xi,yi)
 
+                    # Check if the projected point is within the image bounds
                     if (xi<0) or (yi<0) or (xi>=n_col) or (yi>=n_row):
                         pass
 
-                    # Absolute threshold
+                    # Check if the depth value in the neighboring view is within the depth tolerance
                     elif (np.abs(D[iv,yi,xi] - t2) <= d_tol):
                         C[y,x] = C[y,x] + 1
 
-    # Filter out depths with low cross-view consistency
+    # Filter out depths with low cross-view consistency (based on the number of consistent neighbors)
     if (k > 1):                     # Fixed k neighbors
         idx = (C < k)
     else:                           # Percentage of neighbors
         n_neigh = len(cam_idx)
         k_neigh = int(np.round(k * n_neigh))
         idx = (C < k_neigh)
-
+    
     for i in range(n_row):
         for j in range(n_col):
             if (idx[i,j]):
-                D_consist[i,j] = 0
+                D_cvc[i,j] = 0
 
-    return D_consist, C
+    return D_cvc, C

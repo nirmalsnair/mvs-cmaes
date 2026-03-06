@@ -1,4 +1,4 @@
-'''
+"""
 Interactive patch inspection tool for visualizing the effect of depth adjustments
 on patch similarity across views.
 
@@ -15,7 +15,7 @@ Keyboard shortcuts:
     Ctrl: Large adjustment modifier
     Alt: Very large adjustment modifier
     WIN key: Fine adjustment modifier (for depth value only)
-'''
+"""
 
 import numpy as np
 import scipy.io as spio

@@ -1,4 +1,4 @@
-'''
+"""
 Compare NCC computation times for Python, Numba, and Scipy implementations.
 
 This script tests the performance of different implementations of the normalized
@@ -8,7 +8,7 @@ and a Numba-optimized version with eager compilation.
 
 It also compares the performance of these implementations against the NCC computation
 using SciPy's signal.correlate function.
-'''
+"""
 
 from __future__ import division
 from __future__ import print_function

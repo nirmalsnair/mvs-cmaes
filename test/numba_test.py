@@ -1,4 +1,4 @@
-'''
+"""
 Numba Performance Test Script
 
 This script tests the performance of Numba JIT compilation in different modes
@@ -6,7 +6,7 @@ This script tests the performance of Numba JIT compilation in different modes
 
 The goal is to demonstrate the potential speedup from using Numba and the
 differences between compilation modes.      
-'''
+"""
 
 import time
 from numba import jit, float64
