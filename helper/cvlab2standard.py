@@ -1,4 +1,4 @@
-'''
+"""
 Convert camera matrices from EPFL CVLab format to standard format used in this codebase.
 
 The CVLab dataset can be downloaded from:
@@ -8,7 +8,7 @@ The script assumes that the camera matrices are stored in files with names endin
 'camera' in the specified folder. The converted camera matrices are saved in a .mat file
 with the same name as the dataset, containing a variable 'P' which is a list of camera
 matrices in the standard format.
-'''
+"""
 
 import sys, os.path as path
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))

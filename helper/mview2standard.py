@@ -1,6 +1,6 @@
-'''
+"""
 Middlebury Mview dataset_par.txt to Standard-n34 dataset_P.mat format conversion
-'''
+"""
 
 import sys, os.path as path
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))

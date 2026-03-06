@@ -1,11 +1,11 @@
-'''
+"""
 Create and save foreground masks for an image dataset.
 
 This script uses SLIC superpixel segmentation to create foreground masks for
 each image in the dataset. If SLIC fails to segment the image into 2 regions,
 it falls back to using Chan-Vese segmentation. The resulting binary masks are
 then eroded to refine the foreground regions before being saved to a new directory.
-'''
+"""
 
 import numpy as np
 import os

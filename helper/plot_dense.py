@@ -1,4 +1,4 @@
-'''
+"""
 Helper script to visualize dense point clouds from the output of dmap_zncc.py
 
 This script loads the depth values (TA) and corresponding pixel coordinates (PA) from
@@ -7,7 +7,7 @@ cloud using the camera parameters (P).
 
 The resulting point cloud can be visualized using various libraries such as matplotlib,
 pptk, or open3d.
-'''
+"""
 
 import numpy as np
 import scipy.io as spio

@@ -1,4 +1,4 @@
-'''
+"""
 Test script for shared memory multi-processing in Python.
 
 This script demonstrates how to use shared memory for multi-processing in Python,
@@ -12,7 +12,7 @@ This is a simplified test script to verify that shared memory is working correct
 A modified version is used in the EC-based line search implementations in `dmap_zncc.py`
 and `dmap_daisy.py`, where the image data or descriptors are accessed from shared memory
 to avoid unnecessary copying across processes.
-'''
+"""
 
 import ctypes
 import numpy as np
